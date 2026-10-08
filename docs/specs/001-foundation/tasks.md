@@ -2,7 +2,7 @@
 
 Orden de dependencia. Tests primero (en rojo), luego el código, runner en verde para cerrar la tarea (P4). Los comandos se ejecutan dentro de contenedores salvo los de git.
 
-- [ ] **T1. Base del monorepo y control de versiones.** RF-1, RF-2, RF-12, RF-17
+- [x] **T1. Base del monorepo y control de versiones.** RF-1, RF-2, RF-12, RF-17
   - Hecho cuando: `git init` hecho con la estructura del plan; `.gitignore` excluye `.env`, dependencias y artefactos; `.env.example` contiene solo valores no sensibles; `README.md` documenta prerrequisitos y el comando único de arranque.
 - [ ] **T2. Esqueleto del backend + dominio de readiness (pytest primero).** RF-9 (lógica), RNF-2, RNF-5
   - Hecho cuando: `pyproject.toml` con deps y config de pytest/ruff; `test_readiness.py` y `test_health_api.py` pasan sin levantar servicios; la app FastAPI responde `GET /health` con sondas falsas (200 todo OK, 503 con sonda caída identificada); ruff sin errores.
