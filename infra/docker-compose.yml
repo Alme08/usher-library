@@ -1,0 +1,245 @@
+# Usher Library — Docker Compose for local development.
+#
+# Scope of this file (spec 001, tasks T5 + T6; covers RF-3, RF-5,
+# RF-6, RF-7, RF-8, RF-9 and RF-11):
+#   * PostgreSQL, Redis and Keycloak run in containers, isolated from
+#     the host machine. No host-side runtime is required (RF-3).
+#   * Backend and frontend run in containers built from the repository
+#     itself and expose their services on direct host ports in
+#     development (no reverse proxy, RF-5).
+#   * All services expose healthchecks so `depends_on:
+#     condition: service_healthy` enforces a real readiness ordering
+#     (RF-7): the backend only starts after PostgreSQL and Redis are
+#     healthy, and the frontend only starts after the backend is
+#     healthy.
+#   * The backend's `/health` endpoint (RF-9) runs real connectivity
+#     probes against PostgreSQL and Redis on every call and returns
+#     200 / 503 with the failing dependency named in the response.
+#   * Configuration is loaded from `.env` (gitignored) at the
+#     repository root, falling back to the values declared in
+#     `.env.example`. Secrets are NEVER hardcoded here.
+#
+# Verification: this file is validated statically in this phase. The
+# runtime check (`docker compose up`) must be performed in an
+# environment with a container runtime before T5 / T6 are fully
+# closed.
+
+name: usher-library
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: usher-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_DB: ${POSTGRES_DB:-usher_library}
+      POSTGRES_USER: ${POSTGRES_USER:-usher}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_in_local_env}
+      # Best-practice Postgres image knobs for local dev.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - usher_net
+    healthcheck:
+      # `pg_isready` exits 0 only when the server is accepting
+      # connections on the configured port and for the requested
+      # user/database, so it doubles as a TCP + auth probe.
+      test:
+        - "CMD-SHELL"
+        - "pg_isready -U $${POSTGRES_USER:-usher} -d $${POSTGRES_DB:-usher_library}"
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    container_name: usher-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    environment:
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+    volumes:
+      - redis_data:/data
+    networks:
+      - usher_net
+    healthcheck:
+      # `redis-cli ping` returns "PONG" on a healthy server; the
+      # outer `grep` keeps the probe exit code zero only on success.
+      test:
+        - "CMD-SHELL"
+        - "redis-cli -p $${REDIS_PORT:-6379} ping | grep -q PONG"
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  keycloak:
+    # `start-dev` enables the development profile (HTTP, dev-only
+    # features). `--import-realm` makes Keycloak look for
+    # `realm-export.json` files under `/opt/keycloak/data/import/`
+    # and apply them on first boot, so the realm is reproduced on
+    # every fresh start (RF-3, RF-6).
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: usher-keycloak
+    restart: unless-stopped
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-change_me_in_local_env}
+      KC_HEALTH_ENABLED: "true"
+      # Realm name kept in sync with KEYCLOAK_REALM in .env.example.
+      # The realm-export.json file at /opt/keycloak/data/import must
+      # use the same realm name; otherwise Keycloak will silently skip
+      # the import and create an empty realm.
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-usher-library}
+    volumes:
+      # Read-only mount of the realm definition. Keeping it read-only
+      # prevents container processes from mutating the source file.
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+      - keycloak_data:/opt/keycloak/data
+    networks:
+      - usher_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # Keycloak 24 (``quay.io/keycloak/keycloak:24.0``) is built on
+      # ``ubi9-micro`` (see the upstream Dockerfile), which does NOT
+      # ship ``curl``/``wget``. The original ``curl -fsS`` probe
+      # therefore crashed at first start with "executable file not
+      # found in $PATH" and the container was reported unhealthy,
+      # blocking the rest of the stack (RF-11).
+      #
+      # The upstream Keycloak project recommends a shell-only probe
+      # for the same reason (see Keycloak issue #11618 and the
+      # ``/dev/tcp`` example in their container docs). ``bash`` IS
+      # available in the ubi-micro image; its ``/dev/tcp`` builtin
+      # opens a TCP socket and exits 0 if the connection succeeds,
+      # so a connect to the management port is sufficient to detect
+      # that Keycloak has finished booting and is accepting
+      # connections. The probe is intentionally TCP-only here: an
+      # HTTP-level check would require shipping ``curl`` (or
+      # switching to a custom image), which is a separate decision
+      # and out of scope for this phase (it would only matter once
+      # a consumer of the readiness signal needs to know that
+      # authentication is functional, which is not yet wired up).
+      test:
+        - "CMD-SHELL"
+        - "bash -c 'exec 3<>/dev/tcp/localhost/8080'"
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  backend:
+    # The backend container is built from `backend/` and its entrypoint
+    # (`python -m app.core.startup`) waits for PostgreSQL and Redis with
+    # retries / backoff / fixed total timeout (RF-7). The Compose
+    # `depends_on: condition: service_healthy` guarantees the containers
+    # accept TCP before the wait even begins; the entrypoint wait is a
+    # second line of defence so partial-start does not produce a false
+    # failure.
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: usher-backend
+    restart: unless-stopped
+    environment:
+      # All settings flow from `.env` / `.env.example`. Keeping the
+      # keys aligned with `app/core/config.py` means the same image
+      # works for any deployment target.
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_DB: ${POSTGRES_DB:-usher_library}
+      POSTGRES_USER: ${POSTGRES_USER:-usher}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_in_local_env}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://usher:change_me_in_local_env@postgres:5432/usher_library}
+      BACKEND_HOST: 0.0.0.0
+      BACKEND_PORT: ${BACKEND_PORT:-8000}
+      PROBE_TIMEOUT_SECONDS: ${PROBE_TIMEOUT_SECONDS:-1.0}
+      STARTUP_TIMEOUT_SECONDS: ${STARTUP_TIMEOUT_SECONDS:-30.0}
+    ports:
+      # Direct host mapping (no reverse proxy in development, RF-5).
+      # If the host port is busy, Compose itself reports the conflict
+      # with the offending service and port named (RF-8).
+      - "${BACKEND_PORT:-8000}:${BACKEND_PORT:-8000}"
+    networks:
+      - usher_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      # The endpoint is the readiness signal agreed in the plan:
+      # `GET /health` runs the real probes and returns 200 only when
+      # PostgreSQL and Redis are reachable (RF-9). `--fail` makes
+      # `curl` exit non-zero on any HTTP error so the probe reflects
+      # the actual response code.
+      test:
+        - "CMD-SHELL"
+        - "curl -fsS http://localhost:${BACKEND_PORT:-8000}/health >/dev/null || exit 1"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      # uvicorn + Python imports + the dependency wait all happen before
+      # the first 200. start_period absorbs that window so the probe
+      # is not declared failing while the app is still warming up.
+      start_period: 30s
+
+  frontend:
+    # The frontend container is built from `frontend/` and runs the
+    # Vite dev server. It exposes the provisional page on the host's
+    # `FRONTEND_PORT` (5173 by default, RF-5, RF-10).
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: usher-frontend
+    restart: unless-stopped
+    environment:
+      # Bind to all interfaces so the dev server is reachable from
+      # the host. The values mirror `frontend/vite.config.ts`.
+      HOST: 0.0.0.0
+      PORT: 5173
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    networks:
+      - usher_net
+    depends_on:
+      # Ordering only: the provisional page does not call the
+      # backend, but starting the frontend after the backend is
+      # healthy gives the developer a single signal
+      # (`compose ps` shows "healthy") meaning "everything is up".
+      backend:
+        condition: service_healthy
+    healthcheck:
+      # RF-9 (readiness) and RF-10 (provisional page): a 200 from
+      # the Vite dev server confirms the page is served.
+      test:
+        - "CMD-SHELL"
+        - "curl -fsS http://localhost:5173/ >/dev/null || exit 1"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+networks:
+  usher_net:
+    name: usher_net
+    driver: bridge
+
+volumes:
+  postgres_data:
+    name: usher_postgres_data
+  redis_data:
+    name: usher_redis_data
+  keycloak_data:
+    name: usher_keycloak_data

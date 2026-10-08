@@ -14,7 +14,16 @@ backend/
   Dockerfile                        # imagen de desarrollo del backend
   alembic.ini
   alembic/env.py                    # wiring de Alembic con la URL de entorno
-  alembic/versions/0001_initial_schema.py   # esquema inicial completo (RF-14)
+  alembic/versions/0001_initial_schema.py        # book core (books, book_versions, chapters, paragraphs; RF-14, T7)
+  alembic/versions/0002_annotations_and_comments.py  # annotations + comments con FKs a users diferidas (T8)
+  alembic/versions/0003_users_styles_audit.py   # users, estilos, audit_events + cierra las FKs diferidas de T8 (T9)
+  # Nota: el plan original preveía un único archivo de migración
+  # inicial; la implementación lo dividió en 3 revisiones encadenadas
+  # (``0001 -> 0002 -> 0003``) para poder crear las tablas que
+  # dependen de ``users`` y ``audit_events`` sin alterar la
+  # autoría de cada revisión. El esquema final resultante coincide
+  # con el Initial Schema de ``docs/architecture/database.md``
+  # §30 (RF-14).
   app/
     main.py                         # app factory FastAPI; monta el router de salud
     api/health.py                   # GET /health: sondas + respuesta de readiness (RF-9)
@@ -101,6 +110,7 @@ El orden de arranque global lo garantiza Compose con `depends_on: condition: ser
 7. **Keycloak de desarrollo: realm preconfigurado importado al arranque (`realm-export.json`).** *Descartado: configuración manual vía consola de administración — rompe la reproducibilidad (RF-3, RF-6).*
 8. **Secretos: `.env` local no versionado + `.env.example`; Compose los inyecta como variables de entorno.** *Descartado: Docker secrets — pensado para Swarm; complejidad injustificada en desarrollo.*
 9. **Lint backend: ruff.** *Descartado: flake8+isort+otros — varias dependencias para lo que ruff cubre solo (P1: menos dependencias, menos ADRs).*
+10. **Configuración del backend: `pydantic-settings` (`BaseSettings`).** Introduce una dependencia fuera del listado del plan original (§1 declara `fastapi`, `uvicorn`, `alembic`, `sqlalchemy`, `asyncpg`, `redis`, `pytest`, `ruff`); se documenta aquí para registrar el cambio en la historia de la spec. Justificación: Pydantic v2 movió `BaseSettings` y los `SettingsConfigDict` al paquete independiente `pydantic-settings`, de modo que `from pydantic_settings import BaseSettings` es la forma soportada y recomendada por el proyecto upstream; usarla evita (a) un import deprecado, (b) reimplementar `os.environ` a mano con los errores típicos (typos en nombres de variables, falta de coerción de tipos, falta de defaults tipados, ausencia de `lru_cache` para no re-parsear el entorno en cada llamada), y (c) reescribir manualmente la lógica de `env_file`/case-insensitive/extras que `BaseSettings` ya resuelve. *Descartado: leer `os.environ` a mano — viable para los pocos settings que tenemos hoy, pero introduce boilerplate sin valor añadido y rompe el principio P2 ("menos dependencias, mejor que eso"); descartado también: usar `BaseSettings` desde `pydantic` v2 — no existe, la API vive en `pydantic-settings` desde la v2 de Pydantic.* *Pendiente de ADR formal en la spec 002 (`docs/specs/002-foundation-ci/`), que cubre los ADRs iniciales; esta entrada de plan es el registro provisional que mantiene la spec 001 trazable.*
 
 ## 6. Estrategia de tests
 

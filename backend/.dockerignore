@@ -1,0 +1,43 @@
+# Build context for the backend image. Mirrors `.gitignore` for the
+# Python side and adds a few Dockerfile-specific exclusions.
+
+# Secrets and local config (security §22, RF-17)
+.env
+.env.*
+!.env.example
+
+# Python caches and artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.egg-info/
+.eggs/
+build/
+dist/
+pip-wheel-metadata/
+.tox/
+.venv/
+venv/
+env/
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker artefacts (avoid recursive self-include)
+Dockerfile
+.dockerignore

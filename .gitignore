@@ -37,6 +37,7 @@ pnpm-debug.log*
 .parcel-cache/
 .turbo/
 coverage/
+*.tsbuildinfo
 
 # Build artifacts (general)
 *.log

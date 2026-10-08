@@ -17,6 +17,8 @@ docs/                   Product, architecture, decisions and SDD specs
 
 The full architecture and design constraints live under `docs/architecture/` and `docs/constitution.md`.
 
+> **Note**: `docs/architecture/infrastructure.md` and the `docs/decisions/` directory (Architecture Decision Records) are scheduled to be created by the spec 002 follow-up (`docs/specs/002-foundation-ci/`) and are not part of this phase. The links in the "Documentation" section below will start resolving once that spec lands.
+
 ## Prerequisites
 
 The development environment runs entirely in containers. The host machine only needs a container runtime.
@@ -83,5 +85,6 @@ For the full configuration surface, see `docs/architecture/` and the active spec
 - `MEMORY.md` — short-lived project memory between sessions.
 - `docs/constitution.md` — non-negotiable principles.
 - `docs/architecture/` — architecture overview, system, database, authentication, security, infrastructure.
-- `docs/decisions/` — Architecture Decision Records (ADRs).
+  - `infrastructure.md` — **pending**, delivered by spec 002 (`docs/specs/002-foundation-ci/`).
+- `docs/decisions/` — Architecture Decision Records (ADRs). **Pending**, delivered by spec 002.
 - `docs/specs/` — Spec-Driven Development specs, plans and tasks.

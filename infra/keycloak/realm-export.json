@@ -1,0 +1,90 @@
+{
+  "realm": "usher-library",
+  "enabled": true,
+  "displayName": "Usher Library (development)",
+  "displayNameHtml": "<div class=\"kc-logo-text\"><span>Usher Library</span></div>",
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "sslRequired": "none",
+  "verifyEmail": false,
+  "loginTheme": "keycloak",
+  "accountTheme": "keycloak",
+  "adminTheme": "keycloak",
+  "internationalizationEnabled": false,
+  "defaultSignatureAlgorithm": "RS256",
+  "accessTokenLifespan": 1800,
+  "accessTokenLifespanForImplicitFlow": 900,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 604800,
+  "accessCodeLifespan": 60,
+  "accessCodeLifespanUserAction": 300,
+  "oauth2DeviceCodeLifespan": 600,
+  "oauth2DevicePollingInterval": 5,
+  "registrationAllowed": false,
+  "rememberMe": false,
+  "verifyEmailListedRealm": false,
+  "loginLifecycleBehavior": 1,
+  "clients": [
+    {
+      "clientId": "usher-library-backend",
+      "enabled": true,
+      "clientType": "confidential",
+      "description": "Confidential OIDC client used by the FastAPI backend during local development. The client secret used by the backend at runtime will be injected from the local .env file (the wiring lands in a later spec); the realm export here ships no client secret, so there is nothing to rotate before a non-development deployment.",
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "publicClient": false,
+      "frontchannelLogout": true,
+      "protocol": "openid-connect",
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "",
+        "use.jwks.url": "true",
+        "client.secret.rotation.period": "604800"
+      },
+      "authenticatorConfig": null,
+      "redirectUris": [
+        "http://localhost:8000/auth/callback",
+        "http://127.0.0.1:8000/auth/callback"
+      ],
+      "webOrigins": [
+        "http://localhost:8000",
+        "http://127.0.0.1:8000"
+      ],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "surrogateAuthRequired": false,
+      "alwaysDisplayInConsole": false
+    }
+  ],
+  "clientScopes": [],
+  "defaultDefaultClientScopes": [],
+  "defaultOptionalClientScopes": [],
+  "browserSecurityHeaders": {
+    "contentSecurityPolicyReportOnly": false,
+    "strictTransportSecurity": "max-age=31536000; includeSubDomains",
+    "xContentTypeOptions": "nosniff",
+    "xFrameOptions": "SAMEORIGIN",
+    "referrerPolicy": "no-referrer"
+  },
+  "smtpServer": {},
+  "eventsEnabled": false,
+  "eventsExpiration": 0,
+  "adminEventsEnabled": false,
+  "adminEventsDetailsEnabled": false,
+  "identityProviders": [],
+  "identityProviderMappers": [],
+  "protocolMappers": [],
+  "userFederationProviders": [],
+  "userFederationMappers": [],
+  "roles": {
+    "realm": []
+  },
+  "groups": [],
+  "users": []
+}
