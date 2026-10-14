@@ -29,6 +29,8 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.core.startup import (
+    _ALEMBIC_INI,
+    _BACKEND_DIR,
     DependencyUnavailableError,
     MigrationUpgradeError,
     _amain,
@@ -857,3 +859,105 @@ class TestMigrationUpgradeError:
         )
         assert err.revision == "head"
         assert err.last_error == "RuntimeError: cannot connect"
+
+
+class TestAlembicIniPath:
+    """Regression tests for the alembic.ini path resolution used by
+    ``_run_alembic_upgrade``.
+
+    These tests pin the contract introduced after a runtime bug
+    (``_BACKEND_DIR`` was derived as ``Path(__file__).resolve().parent.parent``
+    which pointed at ``backend/app`` instead of the backend root in both the
+    editable host install and the production-style image layout). The
+    entrypoint-level tests above mock ``_run_alembic_upgrade`` and therefore
+    cannot detect a path-resolution error inside it; this class exercises the
+    real Config/ScriptDirectory plumbing with no infrastructure.
+    """
+
+    def test_backend_dir_points_at_backend_root(self) -> None:
+        # ``_BACKEND_DIR`` must be the directory that *contains* ``alembic.ini``
+        # (i.e. ``<repo>/backend/`` in host and ``/app`` in the image), not the
+        # directory that contains the ``app`` package (``<repo>/backend/app``
+        # or ``/app/app``). The original bug was ``.parent.parent`` which
+        # produced the latter; this test pins it to the former using a
+        # property the buggy derivation cannot satisfy — a sibling
+        # ``alembic.ini`` must exist next to the ``app`` package.
+        assert _BACKEND_DIR.is_dir(), (
+            f"_BACKEND_DIR={_BACKEND_DIR} is not a directory on disk"
+        )
+        assert _ALEMBIC_INI.parent.resolve() == _BACKEND_DIR.resolve(), (
+            f"_ALEMBIC_INI.parent={_ALEMBIC_INI.parent} != _BACKEND_DIR={_BACKEND_DIR}"
+        )
+        # ``_BACKEND_DIR`` must NOT be the ``app/`` package directory: that is
+        # exactly the off-by-one bug we are guarding against.
+        assert not str(_BACKEND_DIR).endswith("/app"), (
+            f"_BACKEND_DIR={_BACKEND_DIR} ends with /app; the original path bug "
+            "is back"
+        )
+        assert (_BACKEND_DIR / "alembic.ini").is_file(), (
+            f"{_BACKEND_DIR}/alembic.ini is missing: _BACKEND_DIR is not the "
+            "backend root"
+        )
+
+    def test_alembic_ini_exists_at_resolved_path(self) -> None:
+        assert _ALEMBIC_INI.is_file(), (
+            f"_ALEMBIC_INI resolved to {_ALEMBIC_INI!s} which is not a file; "
+            "the _run_alembic_upgrade helper will fail with "
+            "'No script_location key found in configuration'."
+        )
+
+    def test_alembic_config_loads_script_location(self) -> None:
+        # Building a real Alembic Config against the resolved ini must surface
+        # a non-empty ``script_location`` that points to the alembic scripts
+        # directory bundled with the backend.
+        from alembic.config import Config
+
+        cfg = Config(str(_ALEMBIC_INI))
+        script_location = cfg.get_main_option("script_location")
+        assert script_location, (
+            "Config built from the resolved ini has no script_location; this "
+            "is the exact failure mode that broke RF-4 in the runtime check."
+        )
+
+        # ``script_location`` is relative to the ini's directory when the ini
+        # uses ``%(here)s`` (which this one does). It must resolve to a real
+        # directory containing ``env.py``.
+        from pathlib import Path
+        resolved = Path(script_location)
+        if not resolved.is_absolute():
+            resolved = (_ALEMBIC_INI.parent / script_location).resolve()
+        assert resolved.is_dir(), (
+            f"script_location {script_location!r} does not resolve to a directory"
+        )
+        assert (resolved / "env.py").is_file(), (
+            "script_location does not contain alembic/env.py; alembic will "
+            "fail to start"
+        )
+
+    def test_script_directory_walks_revisions(self) -> None:
+        # ``ScriptDirectory.from_config`` walks the revisions folder; if the
+        # ini is pointing at the wrong directory this call returns no
+        # revisions and the auto-migration step produces no DDL.
+        from alembic.config import Config
+        from alembic.script import ScriptDirectory
+
+        cfg = Config(str(_ALEMBIC_INI))
+        script = ScriptDirectory.from_config(cfg)
+        revisions = list(script.walk_revisions())
+        # Spec 001 ships 3 revisions (0001 / 0002 / 0003). The test fails
+        # fast if the path ever drifts again.
+        assert len(revisions) == 3, (
+            f"expected 3 alembic revisions under script_location, got "
+            f"{len(revisions)}: {[r.revision for r in revisions]}"
+        )
+        # And they end at the documented head revision
+        # ``0003_users_styles_audit`` (RF-13 / RF-14 / T7-T9).
+        head_ids = [
+            p.stem for p in (_ALEMBIC_INI.parent / "alembic" / "versions").glob(
+                "*.py"
+            ) if p.stem != "__init__"
+        ]
+        assert head_ids, "no alembic revision files found beside alembic.ini"
+        assert "0003_users_styles_audit" in head_ids, (
+            f"expected 0003_users_styles_audit among revisions, got {head_ids}"
+        )

@@ -19,10 +19,10 @@
 #     repository root, falling back to the values declared in
 #     `.env.example`. Secrets are NEVER hardcoded here.
 #
-# Verification: this file is validated statically in this phase. The
-# runtime check (`docker compose up`) must be performed in an
-# environment with a container runtime before T5 / T6 are fully
-# closed.
+# Verification: validated statically in this phase and confirmed with
+# runtime on 2026-10-14 (``docker compose -f infra/docker-compose.yml
+# up -d --wait`` deja los 5 servicios healthy; ver tareas T5/T6 en
+# docs/specs/001-foundation/tasks.md).
 
 name: usher-library
 

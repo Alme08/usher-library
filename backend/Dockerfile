@@ -58,6 +58,13 @@ RUN pip install --upgrade pip \
 # avoids leaking `.env`, caches and local virtualenvs into the image.
 COPY app ./app
 COPY tests ./tests
+# Alembic config + migration scripts must ship with the image: the entrypoint
+# invokes ``python -m app.core.startup`` which calls ``alembic upgrade head``
+# against ``/app/alembic.ini`` (RF-4). ``%(here)s`` in alembic.ini resolves to
+# the directory holding the ini file, so the ``alembic/`` directory must live
+# as a sibling of alembic.ini under ``/app``.
+COPY alembic.ini ./alembic.ini
+COPY alembic ./alembic
 
 # --- Non-root user ------------------------------------------------------------
 # Create an unprivileged user and hand ownership of the working directory to

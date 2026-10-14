@@ -254,7 +254,7 @@ _USER_TABLE_COUNT_SQL = (
 # ``tests/``. Resolving it relative to this file keeps the entrypoint
 # runnable from any working directory, which matters for the
 # ``python -m app.core.startup`` invocation in the Dockerfile.
-_BACKEND_DIR: Final[Path] = Path(__file__).resolve().parent.parent
+_BACKEND_DIR: Final[Path] = Path(__file__).resolve().parent.parent.parent
 _ALEMBIC_INI: Final[Path] = _BACKEND_DIR / "alembic.ini"
 
 

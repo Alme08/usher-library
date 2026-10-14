@@ -22,18 +22,13 @@
   "ssoSessionMaxLifespan": 604800,
   "accessCodeLifespan": 60,
   "accessCodeLifespanUserAction": 300,
-  "oauth2DeviceCodeLifespan": 600,
-  "oauth2DevicePollingInterval": 5,
   "registrationAllowed": false,
   "rememberMe": false,
-  "verifyEmailListedRealm": false,
-  "loginLifecycleBehavior": 1,
   "clients": [
     {
       "clientId": "usher-library-backend",
       "enabled": true,
-      "clientType": "confidential",
-      "description": "Confidential OIDC client used by the FastAPI backend during local development. The client secret used by the backend at runtime will be injected from the local .env file (the wiring lands in a later spec); the realm export here ships no client secret, so there is nothing to rotate before a non-development deployment.",
+      "description": "Confidential OIDC client used by the FastAPI backend during local development.",
       "consentRequired": false,
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
@@ -47,7 +42,6 @@
         "use.jwks.url": "true",
         "client.secret.rotation.period": "604800"
       },
-      "authenticatorConfig": null,
       "redirectUris": [
         "http://localhost:8000/auth/callback",
         "http://127.0.0.1:8000/auth/callback"
