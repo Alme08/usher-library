@@ -7,11 +7,11 @@ description: Úsala siempre que trabajes con Spec-Driven Development en este pro
 
 ## Flujo
 Constitución → Spec → Clarificación → Plan → Tareas → Implementación → Validación → Cambio.
-- Nunca pases a la siguiente fase sin la aprobación explícita del usuario.
+- El usuario aprueba dos cosas: la spec, y después el plan con las tareas. Solo el coordinator pide esas aprobaciones.
 - La spec manda: si algo no está en la spec, no se implementa. Si falta una decisión, para y pregunta.
 - Un cambio de requisitos se hace primero en la spec, luego en el plan y las tareas, y por último en el código.
-- Cada spec vive en su carpeta: `specs/NNN-nombre/` con `spec.md`, `plan.md` y `tasks.md`.
-- Al terminar cada fase, actualiza `MEMORY.md`.
+- Cada spec vive en `docs/specs/NNN-nombre/` con `spec.md`, `plan.md` y `tasks.md`.
+- El avance se marca en tasks.md. MEMORY.md solo se toca al cerrar la spec.
 
 ## Plantilla de spec (spec.md)
 
@@ -41,14 +41,18 @@ La spec describe el QUÉ y el POR QUÉ. Nada de stack, arquitectura ni nombres d
 Cada RF debe ser verificable: nada de "rápido", "intenso" o "bonito" sin un criterio medible.
 
 ## Plan (plan.md)
-Archivos y responsabilidades · Funciones puras (con "hoy" como parámetro) · Algoritmo en pseudocódigo · Interfaz · Decisiones justificadas con su alternativa descartada · Estrategia de tests con `node --test`. Indica qué RF cubre cada parte.
+Máximo 120 líneas. Contiene: archivos y responsabilidades, decisiones con su alternativa descartada, estrategia de tests con los comandos de AGENTS.md y qué RF cubre cada parte. Pseudocódigo solo si el algoritmo no es obvio.
 
 ## Tareas (tasks.md)
 ```
-- [ ] **Tn. <Descripción>.** RF-x, RF-y
- - Hecho cuando: <comprobación verificable>.
+- [ ] **Tn. <Descripción>.** RF-x, RF-y · tipo: simple|compleja · requiere: docker (solo si aplica)
+  - Verify: `<comando exacto>`
+  - Hecho cuando: <comprobación verificable>.
 ```
-Máximo 20-30 min por tarea, en orden de dependencia. Si salen más de 10, propón dividir la spec.
+- Estados: `[ ]` pendiente, `[~]` hecha con verificación solo estática, `[x]` verificada.
+- Una tarea toca 5 archivos como máximo y cabe en una sesión corta. Si necesita más, se divide.
+- Máximo 15 tareas, en orden de dependencia. Si salen más, propón dividir la spec.
+- Las notas de una tarea ocupan una línea.
 
 ## Implementación
-Una sola tarea cada vez: tests primero (en rojo), después el código, `node --test` en verde, marcar la tarea y parar.
+Una sola tarea cada vez. En lógica: tests primero (rojo), después el código. Corre el `Verify:` de la tarea, márcala en tasks.md y para.

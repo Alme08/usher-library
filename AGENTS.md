@@ -1,11 +1,8 @@
 # AGENTS.md — Usher Library
-
 Plataforma de lectura colaborativa centrada inicialmente en *The Fall of the House of Usher* de Edgar Allan Poe.
-
 El libro es el centro de la experiencia. Las interacciones sociales existen alrededor del texto, no como un feed independiente.
 
 ## Stack y estructura
-
 - Frontend: React + TypeScript + Vite.
 - Backend: Python + FastAPI.
 - Base de datos: PostgreSQL.
@@ -17,7 +14,6 @@ El libro es el centro de la experiencia. Las interacciones sociales existen alre
 - Arquitectura: modular monolith.
 
 Estructura principal:
-
 ```text
 frontend/                aplicación React
 backend/                 API y lógica de aplicación
@@ -35,19 +31,15 @@ docs/
 ```
 
 ## Arquitectura
-
 - `docs/architecture/overview.md` → visión arquitectónica.
 - `docs/architecture/system.md` → componentes y comunicación.
 - `docs/architecture/database.md` → modelo de datos.
 - `docs/architecture/authentication.md` → identidad y sesiones.
 - `docs/architecture/security.md` → seguridad.
-- `docs/architecture/infrastructure.md` → infraestructura y despliegue.
-- `docs/decisions/ADR-*.md` → decisiones y su justificación.
 
 Lee únicamente los documentos relevantes para la tarea. No cargues toda la arquitectura por defecto.
 
 ## Producto
-
 - La lectura debe seguir siendo la experiencia principal.
 - No convertir el producto en una red social genérica.
 - Evita añadir feeds, likes, followers, recomendaciones, mensajería u otras funciones no especificadas.
@@ -55,15 +47,11 @@ Lee únicamente los documentos relevantes para la tarea. No cargues toda la arqu
 - Los textos visibles de la interfaz deben estar en inglés, salvo que la spec indique lo contrario.
 
 ## Datos
-
 PostgreSQL es la fuente de verdad.
-
 Redis nunca es fuente de verdad y solo contiene estado derivado o temporal.
-
 El contenido publicado del libro es inmutable.
 
 Las anotaciones siempre apuntan a:
-
 ```text
 BookVersion
   ↓
@@ -74,17 +62,14 @@ end_offset
 ```
 
 Los offsets usan UTF-16 y rangos half-open:
-
 ```text
 [start_offset, end_offset)
 ```
 
 Nunca almacenes coordenadas de página, posiciones DOM o píxeles como ubicación canónica de una anotación.
-
 Los cambios de esquema requieren migraciones Alembic.
 
 ## Autenticación y seguridad
-
 - Keycloak autentica.
 - La aplicación decide autorización.
 - Los roles pertenecen a la aplicación.
@@ -101,18 +86,11 @@ Los cambios de esquema requieren migraciones Alembic.
 Consulta `docs/architecture/security.md` y `docs/architecture/authentication.md` cuando la tarea afecte estas áreas.
 
 ## Memoria
-
-- Al comenzar, lee `MEMORY.md` si existe.
-- También revisa `docs/constitution.md` si existe.
-- Revisa la spec activa en `docs/specs/`.
-- Al terminar, actualiza `MEMORY.md`.
-- Mantén `MEMORY.md` breve: aproximadamente 50 líneas como máximo.
-- Guarda únicamente estado actual, decisiones relevantes y errores importantes.
-- Si una regla pasa a ser permanente, propón moverla a `AGENTS.md` o a la arquitectura correspondiente.
-- Nunca guardes secretos, tokens ni datos personales.
+- MEMORY.md guarda el estado entre specs. Léelo solo si eres el coordinator o la tarea lo cita.
+- Solo el implementer de la última tarea de una spec lo reescribe (máximo 1.5 KB).
+- Aprendizajes técnicos nuevos: una línea en docs/learnings.md.
 
 ## Forma de trabajar
-
 - Haz únicamente lo especificado.
 - No añadas funcionalidades por iniciativa propia.
 - Prefiere cambios pequeños y enfocados.
@@ -122,60 +100,16 @@ Consulta `docs/architecture/security.md` y `docs/architecture/authentication.md`
 - No cambies silenciosamente decisiones arquitectónicas.
 
 ## Flujo SDD
-
 Para cambios no triviales:
+Spec → Plan → Tasks → Implementación → Tests → Review (detalle en la skill sdd)
 
-```text
-Spec
- ↓
-Design
- ↓
-Tasks
- ↓
-Implementation
- ↓
-Tests
- ↓
-Review
-```
+## Flujo SDD
+Spec → Plan → Tasks → Implementación → Tests → Review. Detalle en la skill sdd.
 
-Antes de modificar código:
+Antes de tocar código lee tu tarea y los RF que cita. Lee architecture/ o el glossary solo si la tarea toca ese dominio.
+Si descubres un conflicto arquitectónico: para, documéntalo y propón una decisión. No lo resuelvas en silencio.
 
-1. Lee `docs/product/glossary.md` cuando el dominio sea relevante.
-2. Lee la spec activa.
-3. Lee el `design.md` si existe.
-4. Lee únicamente la arquitectura relevante.
-5. Revisa ADRs aplicables.
-
-Si la implementación descubre un conflicto arquitectónico:
-
-```text
-Detener implementación
-↓
-Documentar el conflicto
-↓
-Proponer decisión
-↓
-Actualizar ADR/arquitectura
-↓
-Continuar
-```
-
-No resuelvas conflictos arquitectónicos silenciosamente.
-
-## Límites
-
-### ✅ Siempre
-
-- Respetar la arquitectura documentada.
-- Validar autorización en backend.
-- Mantener PostgreSQL como fuente de verdad.
-- Mantener las anotaciones basadas en rangos de texto.
-- Añadir tests para cambios relevantes.
-- Mantener `MEMORY.md` actualizado.
-
-### ⚠️ Requiere revisión
-
+## Límites - Requiere revisión
 - Nueva dependencia importante.
 - Nuevo servicio de infraestructura.
 - Cambio de modelo de datos.
@@ -185,70 +119,17 @@ No resuelvas conflictos arquitectónicos silenciosamente.
 - Nueva superficie pública de API.
 - Nueva funcionalidad de seguridad.
 
-### 🚫 Nunca
-
-- Exponer secretos.
-- Confiar en autorización del frontend.
-- Guardar tokens de larga duración en `localStorage`.
-- Modificar texto publicado directamente.
-- Usar Redis como persistencia principal.
-- Introducir microservicios sin una decisión arquitectónica explícita.
-- Añadir funcionalidades no especificadas.
-
 ## Verificación
-
-Frontend:
-
-```text
-lint
-typecheck
-tests
-```
-
-Backend:
-
-```text
-lint
-tests
-```
-
-Base de datos:
-
-```text
-migration validation
-integration tests
-```
-
-Cambios de seguridad:
-
-```text
-security tests
-negative tests
-```
-
-Antes de considerar una tarea terminada:
-
-- ejecuta las verificaciones relevantes;
-- revisa errores de consola;
-- comprueba el comportamiento afectado;
-- documenta cualquier desviación o limitación en `MEMORY.md`.
+  Backend:  cd backend && ruff check . && pytest -q
+  Frontend: cd frontend && npm run lint && npm run typecheck && node --test
+  Compose:  docker compose -f infra/docker-compose.yml up -d --wait
 
 ## Comandos
-
 Los comandos concretos del proyecto deben mantenerse en las specs/skills o en esta sección cuando estén definidos.
 
 Ejemplos esperados:
-
 ```text
-Frontend:
-  lint
-  typecheck
-  test
-
-Backend:
-  lint
-  test
-
-Infrastructure:
-  docker compose ...
+  Backend:  cd backend && ruff check . && pytest -q
+  Frontend: cd frontend && npm run lint && npm run typecheck && node --test
+  Compose:  docker compose -f infra/docker-compose.yml up -d --wait
 ```

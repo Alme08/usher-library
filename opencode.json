@@ -1,0 +1,5 @@
+{
+    "$schema": "https://opencode.ai/config.json",
+    "model": "opencode/minimax-m3",
+    "small_model": "opencode/deepseek-v4.1-flash"
+  }
