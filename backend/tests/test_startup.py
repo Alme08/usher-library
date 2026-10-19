@@ -876,27 +876,63 @@ class TestAlembicIniPath:
 
     def test_backend_dir_points_at_backend_root(self) -> None:
         # ``_BACKEND_DIR`` must be the directory that *contains* ``alembic.ini``
-        # (i.e. ``<repo>/backend/`` in host and ``/app`` in the image), not the
-        # directory that contains the ``app`` package (``<repo>/backend/app``
-        # or ``/app/app``). The original bug was ``.parent.parent`` which
-        # produced the latter; this test pins it to the former using a
-        # property the buggy derivation cannot satisfy — a sibling
-        # ``alembic.ini`` must exist next to the ``app`` package.
+        # (i.e. ``<repo>/backend/`` on the host and ``/app`` in the image — the
+        # image's ``WORKDIR=/app`` is also the layout's backend root), NOT the
+        # ``app/`` package directory (``<repo>/backend/app`` on the host or
+        # ``/app/app`` in the image). The original bug was
+        # ``Path(__file__).resolve().parent.parent`` which produced the
+        # ``app/`` package directory; this test pins the fix with properties
+        # the buggy derivation cannot satisfy, independent of how many levels
+        # deep the path is or what the leaf directory is named (so the test
+          # works the same in the editable host install and the production-style
+          # image layout introduced by spec 002 / T3).
+        #
+          # The four invariants are layout-agnostic on purpose: they catch the
+          # regression no matter where the repo is checked out or which
+          # ``WORKDIR`` the Dockerfile uses.
         assert _BACKEND_DIR.is_dir(), (
             f"_BACKEND_DIR={_BACKEND_DIR} is not a directory on disk"
         )
+        # (1) ``_BACKEND_DIR`` must be the directory that *contains*
+        # ``alembic.ini`` — not the ``app/`` package directory.
         assert _ALEMBIC_INI.parent.resolve() == _BACKEND_DIR.resolve(), (
             f"_ALEMBIC_INI.parent={_ALEMBIC_INI.parent} != _BACKEND_DIR={_BACKEND_DIR}"
         )
-        # ``_BACKEND_DIR`` must NOT be the ``app/`` package directory: that is
-        # exactly the off-by-one bug we are guarding against.
-        assert not str(_BACKEND_DIR).endswith("/app"), (
-            f"_BACKEND_DIR={_BACKEND_DIR} ends with /app; the original path bug "
-            "is back"
-        )
+        # (2) ``alembic.ini`` must exist at that path (catches the
+        # ``.parent.parent`` bug: with the buggy derivation the resolved
+        # ini lives at ``backend/app/../alembic.ini`` which is ``<repo>``
+        # and does not contain ``alembic.ini``).
         assert (_BACKEND_DIR / "alembic.ini").is_file(), (
             f"{_BACKEND_DIR}/alembic.ini is missing: _BACKEND_DIR is not the "
             "backend root"
+        )
+        # (3) ``alembic/`` must exist as a sibling of ``alembic.ini`` (the
+        # Alembic ``script_location``) and must contain ``env.py`` so the
+        # migration guard can actually run.
+        alembic_dir = _BACKEND_DIR / "alembic"
+        assert alembic_dir.is_dir(), (
+            f"{alembic_dir} is not a directory; alembic would fail with "
+            "'No script_location key found in configuration' (RF-4)"
+        )
+        assert (alembic_dir / "env.py").is_file(), (
+            f"{alembic_dir}/env.py is missing; alembic/env.py must ship next "
+            "to alembic.ini"
+        )
+        # (4) ``_BACKEND_DIR`` must NOT coincide with the ``app/`` package
+        # directory: the original D1' bug was exactly that (off-by-one
+        # ``.parent.parent`` -> ``backend/app`` in the host layout or
+        # ``/app/app`` in the image layout). We compare the resolved paths
+        # rather than the textual suffix so the invariant is independent of
+        # where the backend root lives in the filesystem.
+        from pathlib import Path  # noqa: PLC0415 — local import
+
+        from app import __file__ as app_init  # noqa: PLC0415 — local import
+
+        app_pkg = Path(app_init).parent.resolve()
+        assert _BACKEND_DIR.resolve() != app_pkg, (
+            f"_BACKEND_DIR={_BACKEND_DIR} coincides with the app package "
+            f"directory {app_pkg}; this is the off-by-one D1' regression "
+            "(.parent.parent instead of .parent.parent.parent)"
         )
 
     def test_alembic_ini_exists_at_resolved_path(self) -> None:

@@ -17,8 +17,6 @@ docs/                   Product, architecture, decisions and SDD specs
 
 The full architecture and design constraints live under `docs/architecture/` and `docs/constitution.md`.
 
-> **Note**: `docs/architecture/infrastructure.md` and the `docs/decisions/` directory (Architecture Decision Records) are scheduled to be created by the spec 002 follow-up (`docs/specs/002-foundation-ci/`) and are not part of this phase. The links in the "Documentation" section below will start resolving once that spec lands.
-
 ## Prerequisites
 
 The development environment runs entirely in containers. The host machine only needs a container runtime.
@@ -73,6 +71,53 @@ docker compose -f infra/docker-compose.yml exec backend alembic downgrade base
 docker compose -f infra/docker-compose.yml exec backend alembic upgrade head
 ```
 
+## Local verification
+
+The single command that runs the same verification locally as in
+the remote CI (RF-9) is:
+
+```bash
+./scripts/verify.sh [backend|frontend|database|stack|all]
+```
+
+- `backend` — `ruff check . && pytest -q` inside the backend image.
+- `frontend` — `npm run lint && npm run typecheck && node --test && npm run build`
+  inside the frontend image.
+- `database` — disposable PostgreSQL + Redis on a dedicated network,
+  with the migration cycle (`alembic upgrade head` →
+  `alembic downgrade base` → `alembic upgrade head`) and the
+  integration battery after each `upgrade head`.
+- `stack` — full recorrido de arranque under its own Compose project
+  (`-p usher-verify`), so the recorrido never touches the
+  development stack. The verification project uses ports 18000 and
+  15173 instead of the dev ports 8000 and 5173, and its network
+  and volumes are prefixed `usher-verify_*` (the temporary
+  compose file generated inside the script strips the fixed
+  `name:` lines from `infra/docker-compose.yml`). The teardown
+  inside the script removes only the verification project's
+  resources.
+- `all` (default) — runs `backend`, `frontend`, `database` and `stack`
+  in order. This is the complete project verification: the same
+  four jobs the remote CI runs locally in one command.
+
+The script's only resources are the verification project's own.
+Concretely:
+
+- the `database` section creates `usher-verify-db` and
+  `usher-verify-redis` on the disposable network
+  `usher_verify_net`; the script removes them on exit.
+- the `stack` section brings up the verification project
+  (`usher-verify_*`) on the host ports 18000 and 15173; the
+  script removes the project, its network and its volumes on
+  exit.
+
+The development project (`usher-library` / `usher_net` /
+`usher_postgres_data` / `usher_redis_data` / `usher_keycloak_data`)
+is never read, modified or removed by `./scripts/verify.sh`. The
+recorrido de arranque can therefore run with the development stack
+already up — the verification stack stays strictly inside its own
+namespace.
+
 ## Configuration
 
 Local configuration is loaded from a `.env` file at the repository root, which is **not** committed (see `.gitignore`). The committed `.env.example` ships only non-sensitive development placeholders; never put real secrets in it.
@@ -85,6 +130,5 @@ For the full configuration surface, see `docs/architecture/` and the active spec
 - `MEMORY.md` — short-lived project memory between sessions.
 - `docs/constitution.md` — non-negotiable principles.
 - `docs/architecture/` — architecture overview, system, database, authentication, security, infrastructure.
-  - `infrastructure.md` — **pending**, delivered by spec 002 (`docs/specs/002-foundation-ci/`).
-- `docs/decisions/` — Architecture Decision Records (ADRs). **Pending**, delivered by spec 002.
+- `docs/decisions/` — Architecture Decision Records (ADRs).
 - `docs/specs/` — Spec-Driven Development specs, plans and tasks.

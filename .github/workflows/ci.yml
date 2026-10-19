@@ -1,0 +1,99 @@
+# Usher Library — continuous integration (spec 002 / T5, RF-1, RF-2, RF-7, RF-8).
+#
+# This workflow drives the same verification locally and remotely
+# (RNF-2): each job runs one section of ``scripts/verify.sh`` and the
+# script contains all the logic. The workflow adds nothing except the
+# triggers, the runner, the timeouts and the checkout step (plan
+# §2.2 / §2.8). The job timeouts are the values frozen in plan §3;
+# the script itself uses ``--wait`` for the stack recorrido so an
+# unbounded wait cannot exceed the outer ceiling (RNF-3).
+#
+# Triggers (plan §2.8):
+#   * ``on: push`` for every branch.
+#   * ``on: pull_request`` for every PR.
+# Duplicate runs on push + PR are intentional — visibility wins over
+# efficiency (RF-1, RF-8).
+#
+# Secrets (RNF-4): none. The disposable database the ``database`` and
+# ``stack`` sections use lives entirely in short-lived containers and
+# carries ephemeral credentials (``usher`` / ``verify``) that are not
+# materialised in the workflow file. No `secrets.*` reference exists
+# in this file by design.
+#
+# External actions (plan §2.8): only ``actions/checkout``. The runner
+# is ``ubuntu-latest`` which ships Docker and Docker Compose v2 out
+# of the box, so no action is needed to install the container runtime.
+
+name: ci
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+# Cancel in-flight runs when a new commit lands on the same PR/branch:
+# saves runner minutes, no behavioural impact on the contract.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------
+  # backend (RF-2 backend half, RNF-2, RNF-3): lint + tests inside the
+  # backend container. 10 minutes ceiling matches plan §3.
+  # ---------------------------------------------------------------------
+  backend:
+    name: backend (ruff + pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+      - name: verify backend
+        run: ./scripts/verify.sh backend
+
+  # ---------------------------------------------------------------------
+  # frontend (RF-2 frontend half, RF-10, RNF-2, RNF-3): lint +
+  # typecheck + node --test + npm run build inside the frontend
+  # container. 10 minutes ceiling.
+  # ---------------------------------------------------------------------
+  frontend:
+    name: frontend (lint + typecheck + node --test + build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+      - name: verify frontend
+        run: ./scripts/verify.sh frontend
+
+  # ---------------------------------------------------------------------
+  # database (RF-3, RF-4, RF-5, RNF-3): disposable stack + migration
+  # cycle (upgrade → downgrade base → upgrade) + integration tests
+  # after the first and the last upgrade. 15 minutes ceiling.
+  # ---------------------------------------------------------------------
+  database:
+    name: database (disposable stack + migration cycle)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+      - name: verify database
+        run: ./scripts/verify.sh database
+
+  # ---------------------------------------------------------------------
+  # stack (RF-6, RF-7, RNF-3): the full recorrido de arranque — build,
+  # up -d --wait, /health 200, Keycloak realm import, down -v,
+  # re-arranque and the port-conflict test. 20 minutes ceiling.
+  # ---------------------------------------------------------------------
+  stack:
+    name: stack (recorrido de arranque + port conflict)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+      - name: verify stack
+        run: ./scripts/verify.sh stack

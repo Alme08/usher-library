@@ -40,6 +40,13 @@ include = ["app*"]
 testpaths = ["tests"]
 pythonpath = ["."]
 asyncio_mode = "auto"
+markers = [
+    # Integration tests run against a real, throwaway PostgreSQL
+    # instance (spec 002 / T1 + T2). They are skipped unless the
+    # suite is opted into via ``USHER_RUN_INTEGRATION=1`` so the
+    # default ``pytest -q`` of AGENTS.md keeps running offline.
+    "integration: marks tests that talk to a real disposable database",
+]
 filterwarnings = [
     "error",
     # FastAPI / Starlette still emits a deprecation warning about
@@ -47,6 +54,14 @@ filterwarnings = [
     # test run is green for T2. Revisit when the lifecycle API is used.
     "ignore::DeprecationWarning:fastapi.*",
     "ignore::DeprecationWarning:starlette.*",
+    # Starlette 1.8 promotes its internal ``httpx`` deprecation to a
+    # ``StarletteDeprecationWarning`` (a ``UserWarning`` subclass), so
+    # the ``DeprecationWarning`` filter above does not catch it.
+    # Without this ignore the test_health_api module fails to
+    # collect inside the runtime container because ``filterwarnings =
+    # error`` turns the warning into an error during import.
+    # spec 002 / T1.
+    "ignore::starlette.exceptions.StarletteDeprecationWarning",
 ]
 
 [tool.ruff]

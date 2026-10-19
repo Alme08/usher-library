@@ -98,6 +98,7 @@ Consulta `docs/architecture/security.md` y `docs/architecture/authentication.md`
 - Mantén separación clara entre presentación, aplicación, dominio e infraestructura.
 - Antes de introducir una nueva tecnología, dependencia o servicio, verifica la spec y la arquitectura.
 - No cambies silenciosamente decisiones arquitectónicas.
+- Nunca leas ni busques con grep en: dist/, node_modules/, *.lock, package-lock.json, *.min.js. Para dependencias usa `npm ls <paquete>`.
 
 ## Flujo SDD
 Para cambios no triviales:
@@ -121,15 +122,9 @@ Si descubres un conflicto arquitectónico: para, documéntalo y propón una deci
 
 ## Verificación
   Backend:  cd backend && ruff check . && pytest -q
-  Frontend: cd frontend && npm run lint && npm run typecheck && node --test
+  Frontend: cd frontend && npm run lint && npm run typecheck && node --test && npm run build
   Compose:  docker compose -f infra/docker-compose.yml up -d --wait
+  Verificación completa (local e integración continua):  ./scripts/verify.sh
 
 ## Comandos
-Los comandos concretos del proyecto deben mantenerse en las specs/skills o en esta sección cuando estén definidos.
-
-Ejemplos esperados:
-```text
-  Backend:  cd backend && ruff check . && pytest -q
-  Frontend: cd frontend && npm run lint && npm run typecheck && node --test
-  Compose:  docker compose -f infra/docker-compose.yml up -d --wait
-```
+Los comandos concretos del proyecto deben mantenerse en las specs/skills o en esta sección cuando estén definidos. La definición única de verificación del proyecto vive en la sección «Verificación» anterior; este apartado queda libre de listas de comandos que la dupliquen.
