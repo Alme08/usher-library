@@ -2,6 +2,7 @@
 description: SDD - implementa UNA tarea de un plan aprobado, con tests primero
 mode: subagent
 model: opencode-go/minimax-m3
+steps: 50
 permission:
   edit: allow
   bash: allow

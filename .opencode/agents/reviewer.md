@@ -1,11 +1,13 @@
 ---
 description: SDD - revisa la spec como QA (clarificación) y valida la implementación RF por RF, sin modificar nada
 mode: subagent
-model: opencode-go/glm-5.3
+model: glm-5.3-flash-free
+steps: 30
 permission:
   edit: deny
   bash:
-    "*": deny
+    "cd": allow
+    "echo": allow
     "git diff*": allow
     "git status*": allow
     "git log*": allow

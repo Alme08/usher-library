@@ -1,7 +1,7 @@
 ---
 description: SDD - coordina el flujo SDD completo con planner, implementer y reviewer, y transmite el contexto entre fases
 mode: primary
-model: opencode-go/deepseek-v4.1-flash
+model: deepseek-v4.1-flash-free
 permission:
   edit: deny
   bash: deny
@@ -41,3 +41,4 @@ Los subagentes NO ven esta conversación. En cada llamada pásales todo lo que n
 - Nunca te saltes una aprobación del usuario (spec, y plan con tareas).
 - No resuelvas tú las dudas: pregunta al usuario.
 - Informa al usuario en una línea al empezar cada fase. 
+- Cada llamada a un subagente es una sesión nueva. Nunca reanudes ni reutilices una sesión anterior de subagente. Pasa solo rutas e ID de tarea, no informes pegados.

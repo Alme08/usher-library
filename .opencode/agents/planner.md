@@ -2,6 +2,7 @@
 description: SDD - redacta la spec, el plan y las tareas de una petición, sin tocar código
 mode: subagent
 model: opencode-go/kimi-k3
+steps: 25
 permission:
   edit:
     "*": deny
