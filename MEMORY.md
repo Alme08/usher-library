@@ -1,10 +1,17 @@
 Detalles técnicos en docs/learnings.md. Tareas en tasks.md.
 
 ## Estado
-Spec 001 cerrada con runtime el 2026-10-14 (Docker 29.9.0 + Compose v5.6.0). `up -d --wait` → 5 `healthy`; `GET /health` 200 (`postgres ok`, `redis ok`); auto-migración sobre BD fresca aplica 3 upgrades hasta `0003_users_styles_audit`; reproducible con `down -v && up -d --wait`; Keycloak importa `usher-library` (`usher-library-backend`: `publicClient=false`, `serviceAccountsEnabled=true`, `standardFlowEnabled=true`); PG/Redis/KC internos (RF-11); RF-8: `address already in use`. Fixes D1/D1'/D2': `backend/Dockerfile` copia `alembic.ini`+`alembic/`; `_BACKEND_DIR` → `.parent.parent.parent` en `backend/app/core/startup.py:257` + 4 tests `TestAlembicIniPath`; realm-export sin `verifyEmailListedRealm`, `loginLifecycleBehavior`, `oauth2Device*`, `clientType`, `authenticatorConfig`; description 78 chars (`VARCHAR(255)`). Siguiente: spec 002.
+Spec 001 cerrada con runtime el 2026-10-14 (commit `ee86a00`). Spec 002 cerrada el 2026-10-18 con CI en verde en los 4 trabajos (`backend`/`frontend`/`database`/`stack`) sobre `origin/main` (commit `f322397`), confirmado por el usuario; URL/id del run no registrados. Siguiente: primera spec de producto (ninguna abierta).
+
+## Verificación
+Herramienta única: `./scripts/verify.sh` (`all` = backend+frontend+database+stack). Espejo literal de `.github/workflows/ci.yml` (4 secciones, timeouts 10/10/15/20m). El stack corre aislado en el proyecto Compose `usher-verify` (puertos 18000/15173) y no toca el entorno de desarrollo. AGENTS.md «Verificación» es la definición canónica.
 
 ## Decisiones
-Constitución docs/constitution.md (6 principios). Frontend `node --test`, ESLint 9. Backend `python -m app.core.startup` (deps + RF-16 + migra + uvicorn). Alembic `target_metadata = None`. `pydantic-settings` (ADR spec 002).
+Constitución docs/constitution.md (6 principios). Runners por stack con timeouts congelados. `pydantic-settings` cerrada con ADR-0008. Alembic `target_metadata = None`. Backend entrypoint `python -m app.core.startup`. Frontend `node --test` + ESLint 9.
+
+## Documentación
+`docs/architecture/infrastructure.md` y `docs/decisions/ADR-0001…0008` (PostgreSQL, Redis, Keycloak, Docker Compose, FastAPI, React+TS+Vite, GitHub Actions, decisiones menores).
 
 ## Reglas
-"Tests verdes" ≠ "runtime verificado" para Docker/Compose/migraciones. Tests que mockean la función no detectan bugs en *cómo se llama*; cubrir la frontera con un test determinista sin servicios. JSON/YAML estático no detecta campos eliminados entre versiones de Keycloak; el realm real es la única prueba válida.
+- "Tests verdes" ≠ "runtime verificado": tareas con Docker/Compose/migraciones no se dan por hechas sin runtime real.
+- Cambios de verificación van en `verify.sh`; el YAML solo invoca el script, no duplica pasos.
